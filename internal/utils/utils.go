@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"fmt"
 	"log"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +40,15 @@ func ErrorResponse(c *gin.Context, status int, message string, err error) {
 	}
 	c.JSON(status, response)
 
+}
+
+func NotAuthorized(c *gin.Context, message string) {
+	response := domain.Response{
+		Status:  401,
+		Message: message,
+		Data:    nil,
+	}
+	c.AbortWithStatusJSON(401, response)
 }
 
 func GetId(c *gin.Context) uuid.UUID {
@@ -76,4 +88,54 @@ func GenerateJWT(id, username string) (string, error) {
 	}
 
 	return tokenStr, nil
+}
+
+func VerifyJWT(tokenStr string) (bool, error) {
+	keyFunc := func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return false, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return config.PUBLIC_KEY, nil
+	}
+
+	token, err := jwt.Parse(tokenStr, keyFunc)
+	if err != nil {
+		return false, err
+	}
+
+	if !token.Valid {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func ParseScheduledAt(scheduledAt string) (time.Time, error) {
+	now := time.Now()
+	re := regexp.MustCompile(`^(?P<value>\d+)(?P<unit>[smhd])$`)
+	matches := re.FindStringSubmatch(scheduledAt)
+
+	if len(matches) != 3 {
+		return time.Time{}, fmt.Errorf("scheduledAt format is incorrect")
+	}
+
+	value, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse the value in scheduledAt: %v", err)
+	}
+
+	unit := matches[2]
+
+	switch unit {
+	case "s":
+		return now.Add(time.Duration(value) * time.Second), nil
+	case "m":
+		return now.Add(time.Duration(value) * time.Minute), nil
+	case "h":
+		return now.Add(time.Duration(value) * time.Hour), nil
+	case "d":
+		return now.Add(time.Duration(value) * 24 * time.Hour), nil
+	default:
+		return time.Time{}, fmt.Errorf("unknown unit in scheduledAt: %s", unit)
+	}
 }

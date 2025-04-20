@@ -12,11 +12,11 @@ func Routes(router *gin.Engine) {
 	{
 		apiRouter.POST("/auth/login", auth.Login)
 
-		apiRouter.POST("/task", task.Create)
-		apiRouter.GET("/task/:id", task.Read)
-		apiRouter.PUT("/task/:id", task.Update)
-		apiRouter.DELETE("/task/:id", task.Delete)
+		apiRouter.POST("/task", AuthMiddleware(), task.Create)
+		apiRouter.GET("/task/:id", AuthMiddleware(), task.Read)
+		apiRouter.GET("/task/:id", AuthMiddleware(), task.Update)
+		apiRouter.PUT("/task/:id", AuthMiddleware(), task.Delete)
 
-		apiRouter.GET("/ping", status.Ping)
+		apiRouter.GET("/ping", AuthMiddleware(), status.Ping)
 	}
 }

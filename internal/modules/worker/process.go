@@ -2,10 +2,14 @@ package worker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	_ "github.com/lib/pq"
 
 	"github.com/hjunior29/nebulosa-async-api/internal/config"
 	"github.com/hjunior29/nebulosa-async-api/internal/config/database"
@@ -52,67 +56,94 @@ func ExecuteRequest(task domain.Task) (*http.Response, error) {
 }
 
 func StartWorker() {
-	timer := 1 * time.Second
-	taskTicker := time.NewTicker(timer)
-	defer taskTicker.Stop()
+	go startListener()
+	go startPolling()
+	go pingAPI()
+}
 
-	pingTicker := time.NewTicker(10 * time.Second)
-	defer pingTicker.Stop()
+func startListener() {
+	ctx := context.Background()
+
+	conn, err := pgx.Connect(ctx, config.DATABASE_URL)
+	if err != nil {
+		log.Fatalf("unable to connect: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	_, err = conn.Exec(ctx, "LISTEN new_task")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	log.Println("Worker listening for new tasks...")
 
 	for {
-		select {
-		case <-taskTicker.C:
-			var pendingTasks []domain.Task
-			repo := database.NewRepository(&pendingTasks, nil)
+		notification, err := conn.WaitForNotification(ctx)
+		if err != nil {
+			log.Printf("notification error: %v", err)
+			continue
+		}
 
-			if err := repo.FindAllWhere(map[string]interface{}{"status": domain.StatusPending}); err != nil {
-				log.Println("Error fetching pending tasks:", err)
-				continue
-			}
+		go processTaskByID(notification.Payload)
+	}
+}
 
-			if len(pendingTasks) == 0 {
-				taskTicker.Stop()
-				timer = time.Duration(float64(timer) * 1.2)
+func startPolling() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
 
-				if timer > 10*time.Second {
-					timer = 1 * time.Second
-				}
-				taskTicker = time.NewTicker(timer)
-				log.Println("No pending tasks, sleeping for", timer)
-				continue
-			}
+	log.Println("Worker polling started...")
 
-			timer = 1 * time.Second
-			taskTicker.Reset(timer)
+	for {
+		<-ticker.C
 
-			for _, task := range pendingTasks {
-				taskRepo := database.NewRepository(&task, nil)
+		var tasks []domain.Task
+		repo := database.NewRepository(&tasks, nil)
 
-				if task.MaxRetries <= task.Attempts {
-					updateTaskStatus(taskRepo, &task, domain.StatusFailed)
-					continue
-				}
+		err := repo.FindAllWhere(map[string]interface{}{
+			"status": domain.StatusPending,
+		})
+		if err != nil {
+			log.Println("Polling error fetching tasks:", err)
+			continue
+		}
 
-				response, err := ExecuteRequest(task)
-				if err != nil {
-					handleTaskFailure(taskRepo, &task, err, response)
-					continue
-				}
-
-				if response != nil && response.Body != nil {
-					response.Body.Close()
-				}
-
-				updateTaskStatus(taskRepo, &task, domain.StatusSuccess)
-			}
-		case <-pingTicker.C:
-			_, err := http.Get(config.API_URL + "/api/ping")
-			if err != nil {
-				log.Println("Error pinging worker:", err)
-				continue
-			}
+		for _, task := range tasks {
+			t := task
+			go processTask(t)
 		}
 	}
+}
+
+func processTaskByID(id string) {
+	var task domain.Task
+	repo := database.NewRepository(&task, nil)
+	if err := repo.FindAllWhere(map[string]interface{}{"id": id}); err != nil {
+		log.Println("Failed to find task:", err)
+		return
+	}
+	processTask(task)
+}
+
+func processTask(task domain.Task) {
+	repo := database.NewRepository(&task, nil)
+
+	if task.MaxRetries <= task.Attempts {
+		updateTaskStatus(repo, &task, domain.StatusFailed)
+		return
+	}
+
+	response, err := ExecuteRequest(task)
+	if err != nil {
+		handleTaskFailure(repo, &task, err, response)
+		return
+	}
+
+	if response != nil && response.Body != nil {
+		response.Body.Close()
+	}
+
+	updateTaskStatus(repo, &task, domain.StatusSuccess)
 }
 
 func updateTaskStatus(repo database.Repository, task *domain.Task, status domain.TaskStatus) {
@@ -131,5 +162,28 @@ func handleTaskFailure(repo database.Repository, task *domain.Task, err error, r
 	}
 	if err := repo.Save(); err != nil {
 		log.Println("Failed to update task failure:", err)
+	}
+}
+
+func pingAPI() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	stopAt := time.After(10 * time.Minute)
+
+	for {
+		select {
+		case <-stopAt:
+			log.Println("Stopping API ping after 10 minutes.")
+			return
+		case <-ticker.C:
+			resp, err := http.Get(config.API_URL + "/api/ping")
+			if err != nil {
+				log.Println("Failed to ping API:", err)
+				continue
+			}
+			if resp.Body != nil {
+				resp.Body.Close()
+			}
+		}
 	}
 }
