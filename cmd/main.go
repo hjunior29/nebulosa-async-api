@@ -19,8 +19,14 @@ func init() {
 	}
 
 	err = database.Migrate(
+		&domain.User{},
 		&domain.Task{},
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = database.Seed()
 	if err != nil {
 		log.Fatal(err)
 	}

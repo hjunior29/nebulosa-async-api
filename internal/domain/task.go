@@ -3,9 +3,7 @@ package domain
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 type TaskStatus string
@@ -18,10 +16,7 @@ const (
 )
 
 type Task struct {
-	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid()"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	DeletedAt   gorm.DeletedAt `gorm:"index"`
+	Default
 	Endpoint    string         `json:"endpoint"`
 	Headers     datatypes.JSON `json:"headers" gorm:"type:jsonb"`
 	Method      string         `json:"method"`
