@@ -3,6 +3,7 @@ package task
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hjunior29/nebulosa-async-api/internal/config/database"
@@ -25,19 +26,13 @@ func Create(c *gin.Context) {
 		return
 	}
 
-	var requestBody map[string]interface{}
-	if err := c.ShouldBindJSON(&requestBody); err != nil {
-		utils.ErrorResponse(c, 400, "Invalid request body", err)
-		return
-	}
-
-	if interval, ok := requestBody["scheduledAtInterval"].(string); ok && interval != "" {
-		futureTime, parseErr := utils.ParseScheduledAt(interval)
-		if parseErr != nil {
-			utils.ErrorResponse(c, 400, "Invalid scheduledAtInterval format", parseErr)
+	if task.ScheduledAt != "" {
+		scheduledAt, err := utils.ParseScheduledAt(task.ScheduledAt)
+		if err != nil {
+			utils.ErrorResponse(c, 400, "Invalid scheduledAt format", err)
 			return
 		}
-		task.ScheduledAtTime = futureTime
+		task.ScheduledAtTime = scheduledAt
 	}
 
 	task.Status = domain.StatusPending
@@ -48,16 +43,17 @@ func Create(c *gin.Context) {
 		return
 	}
 
-	sqlDB, dbErr := database.Get().DB()
-	if dbErr != nil {
-		log.Println("Failed to get sql.DB:", dbErr)
-	} else {
-		_, notifyErr := sqlDB.Exec(fmt.Sprintf("NOTIFY new_task, '%s'", task.ID.String()))
-		if notifyErr != nil {
-			log.Println("Failed to notify new_task:", notifyErr)
+	if task.ScheduledAtTime.Before(time.Now()) {
+		sqlDB, dbErr := database.Get().DB()
+		if dbErr != nil {
+			log.Println("Failed to get sql.DB:", dbErr)
+		} else {
+			_, notifyErr := sqlDB.Exec(fmt.Sprintf("NOTIFY new_task, '%s'", task.ID.String()))
+			if notifyErr != nil {
+				log.Println("Failed to notify new_task:", notifyErr)
+			}
 		}
 	}
 
 	utils.SuccessResponse(c, 201, "Task created successfully", task)
-
 }

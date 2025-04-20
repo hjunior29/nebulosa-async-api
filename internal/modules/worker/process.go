@@ -89,7 +89,7 @@ func startListener() {
 }
 
 func startPolling() {
-	ticker := time.NewTicker(15 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	log.Println("Worker polling started...")
@@ -101,7 +101,8 @@ func startPolling() {
 		repo := database.NewRepository(&tasks, nil)
 
 		err := repo.FindAllWhere(map[string]interface{}{
-			"status": domain.StatusPending,
+			"status":              domain.StatusPending,
+			"scheduled_at_time <": time.Now(),
 		})
 		if err != nil {
 			log.Println("Polling error fetching tasks:", err)
@@ -142,6 +143,8 @@ func processTask(task domain.Task) {
 	if response != nil && response.Body != nil {
 		response.Body.Close()
 	}
+
+	task.StatusCode = response.StatusCode
 
 	updateTaskStatus(repo, &task, domain.StatusSuccess)
 }

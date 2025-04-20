@@ -14,9 +14,9 @@ func Routes(router *gin.Engine) {
 
 		apiRouter.POST("/task", AuthMiddleware(), task.Create)
 		apiRouter.GET("/task/:id", AuthMiddleware(), task.Read)
-		apiRouter.GET("/task/:id", AuthMiddleware(), task.Update)
-		apiRouter.PUT("/task/:id", AuthMiddleware(), task.Delete)
+		apiRouter.PUT("/task/:id", AuthMiddleware(), task.Update)
+		apiRouter.DELETE("/task/:id", AuthMiddleware(), task.Delete)
 
-		apiRouter.GET("/ping", AuthMiddleware(), status.Ping)
+		apiRouter.GET("/ping", status.Ping)
 	}
 }
