@@ -20,7 +20,8 @@ var (
 	DATABASE_PORT string
 	DATABASE_URL  string
 
-	API_URL string
+	API_URL    string
+	ORIGIN_URL string
 
 	USERNAME string
 	PASSWORD string
@@ -56,6 +57,7 @@ func init() {
 	)
 
 	API_URL = getEnv("API_URL")
+	ORIGIN_URL = getEnv("ORIGIN_URL")
 
 	USERNAME = getEnv("USERNAME")
 	PASSWORD = getEnv("PASSWORD")

@@ -15,6 +15,7 @@ type Repository interface {
 	GetDeleted(where map[string]interface{}) error
 
 	FindAllWhere(where map[string]interface{}, preloads ...string) error
+	FindAllUnscoped(preloads ...string) error
 
 	Create() error
 	Save() error
@@ -57,6 +58,12 @@ func (r *repositoryImpl) FindAllWhere(where map[string]interface{}, preloads ...
 	queryDb := r.checkPreloads(preloads...)
 	queryDb = r.applyConditions(queryDb, where).Find(r.entity)
 	return queryDb.Error
+}
+
+func (r *repositoryImpl) FindAllUnscoped(preloads ...string) error {
+	queryDB := r.checkPreloads(preloads...)
+	queryDB = queryDB.Unscoped().Find(r.entity) // ignora o filtro deleted_at
+	return queryDB.Error
 }
 
 func (r *repositoryImpl) Create() error {

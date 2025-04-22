@@ -8,11 +8,14 @@ import (
 )
 
 func Routes(router *gin.Engine) {
+	router.Use(Cors())
+
 	apiRouter := router.Group("/api")
 	{
 		apiRouter.POST("/auth/login", auth.Login)
 
 		apiRouter.POST("/task", AuthMiddleware(), task.Create)
+		apiRouter.GET("/task", AuthMiddleware(), task.List)
 		apiRouter.GET("/task/:id", AuthMiddleware(), task.Read)
 		apiRouter.PUT("/task/:id", AuthMiddleware(), task.Update)
 		apiRouter.DELETE("/task/:id", AuthMiddleware(), task.Delete)

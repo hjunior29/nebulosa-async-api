@@ -21,6 +21,7 @@ func SuccessResponse(c *gin.Context, status int, message string, data interface{
 		Message: message,
 		Data:    data,
 	}
+
 	c.JSON(status, response)
 }
 
@@ -38,6 +39,7 @@ func ErrorResponse(c *gin.Context, status int, message string, err error) {
 		Message: message,
 		Data:    nil,
 	}
+
 	c.JSON(status, response)
 
 }
@@ -48,6 +50,7 @@ func NotAuthorized(c *gin.Context, message string) {
 		Message: message,
 		Data:    nil,
 	}
+
 	c.AbortWithStatusJSON(401, response)
 }
 
