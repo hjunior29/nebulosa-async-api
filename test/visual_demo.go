@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -100,13 +99,6 @@ func main() {
 
 	time.Sleep(2 * time.Second)
 
-	// Loop contínuo criando tasks aleatórias por 2 minutos
-	fmt.Println()
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("🔄 FASE 5: Loop contínuo de 2 minutos criando tasks aleatórias")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	continuousTaskCreation(2 * time.Minute)
-
 	// Listar todas as tasks no final
 	fmt.Println()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -114,10 +106,16 @@ func main() {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	listAllTasks()
 
+	// Cleanup: Deletar todas as tasks
+	fmt.Println()
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("🧹 CLEANUP: Deletando todas as tasks do banco")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	deleteAllTasks()
+
 	fmt.Println()
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
 	fmt.Println("║              TESTE FINALIZADO COM SUCESSO!                   ║")
-	fmt.Println("║     Verifique o frontend para visualizar as tasks           ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
 }
 
@@ -379,86 +377,6 @@ func createAllTasksInParallel() {
 	fmt.Printf("   ✅ Todas as %d tasks foram criadas de uma vez!\n", len(allTasks))
 }
 
-func continuousTaskCreation(duration time.Duration) {
-	endTime := time.Now().Add(duration)
-	taskCounter := 0
-
-	taskTypes := []string{
-		"email-notification",
-		"sms-alert",
-		"push-notification",
-		"data-export",
-		"report-generation",
-		"file-processing",
-		"image-resize",
-		"video-transcode",
-		"pdf-generation",
-		"backup-task",
-		"cleanup-job",
-		"analytics-event",
-		"audit-log",
-		"cache-invalidation",
-		"index-rebuild",
-	}
-
-	endpoints := []string{
-		"https://httpbin.org/post",
-		"https://httpbin.org/put",
-		"https://jsonplaceholder.typicode.com/posts",
-		"https://httpbin.org/status/200",
-		"https://httpbin.org/status/500", // Alguns vão falhar
-		"https://httpbin.org/delay/5",
-	}
-
-	methods := []string{"POST", "PUT", "PATCH"}
-
-	scheduledOptions := []string{"", "", "", "10s", "20s", "30s", "1m"} // Maioria imediata
-
-	fmt.Printf("   Iniciando loop de %v...\n", duration)
-	fmt.Println("   [Pressione Ctrl+C para interromper]")
-	fmt.Println()
-
-	for time.Now().Before(endTime) {
-		taskCounter++
-
-		taskType := taskTypes[rand.Intn(len(taskTypes))]
-		endpoint := endpoints[rand.Intn(len(endpoints))]
-		method := methods[rand.Intn(len(methods))]
-		scheduled := scheduledOptions[rand.Intn(len(scheduledOptions))]
-
-		task := TaskRequest{
-			Endpoint: endpoint,
-			Method:   method,
-			Payload: map[string]any{
-				"taskNumber": taskCounter,
-				"taskType":   taskType,
-				"timestamp":  time.Now().Format(time.RFC3339),
-				"randomData": rand.Int63(),
-			},
-			Headers:     map[string]string{"X-Task-Number": fmt.Sprintf("%d", taskCounter)},
-			Type:        fmt.Sprintf("%s-%d", taskType, taskCounter),
-			MaxRetries:  rand.Intn(3) + 1,
-			ScheduledAt: scheduled,
-		}
-
-		if err := createTask(task); err != nil {
-			fmt.Printf("   ❌ Task #%d falhou: %v\n", taskCounter, err)
-		}
-
-		// Intervalo aleatório entre 2-5 segundos
-		sleepTime := time.Duration(2000+rand.Intn(3000)) * time.Millisecond
-		time.Sleep(sleepTime)
-
-		// Mostra progresso a cada 10 tasks
-		if taskCounter%10 == 0 {
-			remaining := time.Until(endTime)
-			fmt.Printf("   📊 Progresso: %d tasks criadas | Tempo restante: %v\n", taskCounter, remaining.Round(time.Second))
-		}
-	}
-
-	fmt.Printf("\n   ✅ Loop finalizado! Total de tasks criadas: %d\n", taskCounter)
-}
-
 func listAllTasks() {
 	req, _ := http.NewRequest("GET", baseURL+"/task", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -497,6 +415,69 @@ func listAllTasks() {
 		}
 		fmt.Printf("   ────────────────────────────\n")
 	}
+}
+
+func deleteAllTasks() {
+	req, _ := http.NewRequest("GET", baseURL+"/task", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		fmt.Printf("   ❌ Erro ao listar tasks para deletar: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var apiResp APIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		fmt.Printf("   ❌ Erro ao decodificar resposta: %v\n", err)
+		return
+	}
+
+	tasks, ok := apiResp.Data.([]interface{})
+	if !ok {
+		fmt.Println("   ❌ Erro: formato de resposta inválido")
+		return
+	}
+
+	totalTasks := len(tasks)
+	if totalTasks == 0 {
+		fmt.Println("   ✅ Nenhuma task para deletar")
+		return
+	}
+
+	fmt.Printf("   Deletando %d tasks...\n", totalTasks)
+
+	deleted := 0
+	for _, t := range tasks {
+		task, ok := t.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, ok := task["ID"].(string)
+		if !ok {
+			continue
+		}
+
+		delReq, _ := http.NewRequest("DELETE", baseURL+"/task/"+id, nil)
+		delReq.Header.Set("Authorization", "Bearer "+token)
+
+		delResp, err := httpClient.Do(delReq)
+		if err != nil {
+			fmt.Printf("   ❌ Erro ao deletar task %s: %v\n", id, err)
+			continue
+		}
+
+		if delResp.StatusCode == 200 {
+			deleted++
+		} else {
+			body, _ := io.ReadAll(delResp.Body)
+			fmt.Printf("   ❌ Falha ao deletar task %s: status %d - %s\n", id, delResp.StatusCode, string(body))
+		}
+		delResp.Body.Close()
+	}
+
+	fmt.Printf("   ✅ %d/%d tasks deletadas com sucesso!\n", deleted, totalTasks)
 }
 
 func getStatusEmoji(status string) string {
