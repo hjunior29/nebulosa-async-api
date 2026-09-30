@@ -1,11 +1,12 @@
 package database
 
 import (
-	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
+	"github.com/glebarez/sqlite"
 	"github.com/hjunior29/nebulosa-async-api/internal/config"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -13,21 +14,26 @@ import (
 var instance *gorm.DB
 
 func New() error {
-	host := config.DATABASE_HOST
-	user := config.DATABASE_USER
-	password := config.DATABASE_PASS
-	name := config.DATABASE_NAME
-	port := config.DATABASE_PORT
+	dbPath := config.DATABASE_URL
+	if dbPath == "" {
+		dbPath = "/data/nebulosa.db"
+	}
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		host, user, password, name, port,
-	)
+	if dir := filepath.Dir(dbPath); dir != "" && dir != "." {
+		_ = os.MkdirAll(dir, 0755)
+	}
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
 		return err
+	}
+
+	if sqlDB, err := db.DB(); err == nil {
+		if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL;"); err != nil {
+			log.Println("Failed to set PRAGMA journal_mode=WAL:", err)
+		}
 	}
 
 	if db != nil {

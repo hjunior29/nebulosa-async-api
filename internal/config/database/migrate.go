@@ -27,7 +27,7 @@ func Seed() error {
 	password := config.PASSWORD
 
 	if username == "" || password == "" {
-		log.Panic("Username or password not provided. Skipping seeding.")
+		log.Println("Username or password not provided. Skipping seeding.")
 		return nil
 	}
 

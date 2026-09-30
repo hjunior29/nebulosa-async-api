@@ -2,19 +2,24 @@ package worker
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	_ "github.com/lib/pq"
-
 	"github.com/hjunior29/nebulosa-async-api/internal/config"
 	"github.com/hjunior29/nebulosa-async-api/internal/config/database"
 	"github.com/hjunior29/nebulosa-async-api/internal/domain"
 )
+
+var TaskChannel = make(chan string, 100)
+
+func TriggerTask(id string) {
+	select {
+	case TaskChannel <- id:
+	default:
+	}
+}
 
 func buildRequest(task domain.Task) (*http.Request, error) {
 	body := bytes.NewReader([]byte{})
@@ -56,35 +61,15 @@ func ExecuteRequest(task domain.Task) (*http.Response, error) {
 }
 
 func StartWorker() {
-	go startListener()
+	go startChannelListener()
 	go startPolling()
 	go pingAPI()
 }
 
-func startListener() {
-	ctx := context.Background()
-
-	conn, err := pgx.Connect(ctx, config.DATABASE_URL)
-	if err != nil {
-		log.Fatalf("unable to connect: %v", err)
-	}
-	defer conn.Close(ctx)
-
-	_, err = conn.Exec(ctx, "LISTEN new_task")
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	log.Println("Worker listening for new tasks...")
-
-	for {
-		notification, err := conn.WaitForNotification(ctx)
-		if err != nil {
-			log.Printf("notification error: %v", err)
-			continue
-		}
-
-		go processTaskByID(notification.Payload)
+func startChannelListener() {
+	log.Println("Worker listening for new tasks via internal channel...")
+	for id := range TaskChannel {
+		go processTaskByID(id)
 	}
 }
 

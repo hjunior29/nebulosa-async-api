@@ -1,13 +1,12 @@
 package task
 
 import (
-	"fmt"
-	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hjunior29/nebulosa-async-api/internal/config/database"
 	"github.com/hjunior29/nebulosa-async-api/internal/domain"
+	"github.com/hjunior29/nebulosa-async-api/internal/modules/worker"
 	"github.com/hjunior29/nebulosa-async-api/internal/utils"
 )
 
@@ -44,15 +43,7 @@ func Create(c *gin.Context) {
 	}
 
 	if task.ScheduledAtTime.Before(time.Now()) {
-		sqlDB, dbErr := database.Get().DB()
-		if dbErr != nil {
-			log.Println("Failed to get sql.DB:", dbErr)
-		} else {
-			_, notifyErr := sqlDB.Exec(fmt.Sprintf("NOTIFY new_task, '%s'", task.ID.String()))
-			if notifyErr != nil {
-				log.Println("Failed to notify new_task:", notifyErr)
-			}
-		}
+		worker.TriggerTask(task.ID.String())
 	}
 
 	utils.SuccessResponse(c, 201, "Task created successfully", task)

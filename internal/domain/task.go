@@ -18,9 +18,9 @@ const (
 type Task struct {
 	Default
 	Endpoint        string         `json:"endpoint"`
-	Headers         datatypes.JSON `json:"headers" gorm:"type:jsonb"`
+	Headers         datatypes.JSON `json:"headers"`
 	Method          string         `json:"method"`
-	Payload         datatypes.JSON `json:"payload" gorm:"type:jsonb"`
+	Payload         datatypes.JSON `json:"payload"`
 	Type            string         `json:"type"`
 	Status          TaskStatus     `json:"status"`
 	MaxRetries      int            `json:"maxRetries"`

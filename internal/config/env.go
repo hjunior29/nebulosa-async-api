@@ -2,9 +2,9 @@ package config
 
 import (
 	"crypto/rsa"
-	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
@@ -31,44 +31,49 @@ var (
 )
 
 func init() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		err = nil
-		err = godotenv.Load("../.env")
-		if err != nil {
-			log.Fatal("Error loading .env file")
-		}
-	}
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load("../.env")
 
 	PORT = getEnv("PORT")
-	DATABASE_HOST = getEnv("DATABASE_HOST")
-	DATABASE_USER = getEnv("DATABASE_USER")
-	DATABASE_PASS = getEnv("DATABASE_PASS")
-	DATABASE_NAME = getEnv("DATABASE_NAME")
-	DATABASE_PORT = getEnv("DATABASE_PORT")
+	if PORT == "" {
+		PORT = "8080"
+	}
 
-	DATABASE_URL = fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		DATABASE_HOST,
-		DATABASE_USER,
-		DATABASE_PASS,
-		DATABASE_NAME,
-		DATABASE_PORT,
-	)
+	DATABASE_URL = getEnv("DATABASE_URL")
+	if DATABASE_URL == "" {
+		DATABASE_URL = "/data/nebulosa.db"
+	}
 
 	API_URL = getEnv("API_URL")
+	if API_URL == "" {
+		API_URL = "http://localhost:8080"
+	}
 	ORIGIN_URL = getEnv("ORIGIN_URL")
+	if ORIGIN_URL == "" {
+		ORIGIN_URL = "*"
+	}
 
 	USERNAME = getEnv("USERNAME")
 	PASSWORD = getEnv("PASSWORD")
 
-	PRIVATE_KEY, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(getEnv("PRIVATE_KEY")))
-	if err != nil {
-		log.Fatal("Error parsing private key")
+	privKeyStr := getEnv("PRIVATE_KEY")
+	if privKeyStr != "" {
+		privKeyStr = strings.ReplaceAll(privKeyStr, "\\n", "\n")
+		var err error
+		PRIVATE_KEY, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(privKeyStr))
+		if err != nil {
+			log.Println("Warning: error parsing private key:", err)
+		}
 	}
-	PUBLIC_KEY, err = jwt.ParseRSAPublicKeyFromPEM([]byte(getEnv("PUBLIC_KEY")))
-	if err != nil {
-		log.Fatal("Error parsing public key")
+
+	pubKeyStr := getEnv("PUBLIC_KEY")
+	if pubKeyStr != "" {
+		pubKeyStr = strings.ReplaceAll(pubKeyStr, "\\n", "\n")
+		var err error
+		PUBLIC_KEY, err = jwt.ParseRSAPublicKeyFromPEM([]byte(pubKeyStr))
+		if err != nil {
+			log.Println("Warning: error parsing public key:", err)
+		}
 	}
 }
 

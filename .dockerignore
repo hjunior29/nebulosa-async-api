@@ -1,0 +1,6 @@
+.git/
+.env
+fly.toml
+*.db
+*.db-wal
+*.db-shm
